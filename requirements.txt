@@ -1,0 +1,19 @@
+fastapi
+uvicorn[standard]
+sqlmodel
+pydantic-settings
+python-dotenv
+pytest
+httpx
+
+# Auth
+passlib[bcrypt]
+python-jose[cryptography]
+
+# File uploads
+python-multipart
+aiofiles
+Pillow
+
+# Templates
+jinja2
