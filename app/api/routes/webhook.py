@@ -92,7 +92,7 @@ async def receive_meta_webhook(
             db=session,
         )
 
-        # Dispatch response back via WhatsApp
+        # Dispatch response back to customer via WhatsApp
         config = session.exec(select(WhatsAppConfig).where(WhatsAppConfig.tenant_id == tenant.id)).first()
         if config and config.phone_number_id and config.access_token:
             if result.get("buttons"):
@@ -109,6 +109,21 @@ async def receive_meta_webhook(
                     access_token=config.access_token,
                     recipient_phone=customer_phone,
                     text=result["reply_text"],
+                )
+
+            # Instant WhatsApp Alert to Business Owner's Personal Phone on New Order
+            if result.get("order_id") and tenant.contact_phone:
+                owner_alert_text = (
+                    f"🔔 *NEW ORDER RECEIVED for {tenant.business_name}!*\n\n"
+                    f"• Order: #{result.get('order_number')}\n"
+                    f"• Customer: {customer_phone}\n\n"
+                    f"Please check your OrderMate dashboard to start preparing!"
+                )
+                await WhatsAppService.send_text_message(
+                    phone_number_id=config.phone_number_id,
+                    access_token=config.access_token,
+                    recipient_phone=tenant.contact_phone,
+                    text=owner_alert_text,
                 )
 
         return {"status": "ok", "response": result}

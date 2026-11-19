@@ -1,0 +1,1142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OrderMate AI — Self-Service WhatsApp Ordering SaaS</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        wa: {
+                            green: '#25D366',
+                            dark: '#075E54',
+                            teal: '#128C7E',
+                            light: '#DCF8C6',
+                            bg: '#ECE5DD',
+                            chatbg: '#EFEAE2'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Alpine.js -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        [x-cloak] { display: none !important; }
+        .custom-scrollbar::-webkit-scrollbar { width: 5px; height: 5px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #f1f1f1; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #c1c1c1; border-radius: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #a8a8a8; }
+        .wa-bg-pattern {
+            background-color: #efeae2;
+            background-image: radial-gradient(#d5ceb5 1px, transparent 1px);
+            background-size: 16px 16px;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans antialiased" x-data="dashboardApp()" x-init="init()">
+
+    <!-- ── AUTHENTICATION MODAL (if not logged in) ─────────────────────── -->
+    <div x-show="!isAuthenticated" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/70 backdrop-blur-sm p-4">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-100">
+            <!-- Header Banner -->
+            <div class="bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 p-6 text-white text-center">
+                <div class="inline-flex items-center justify-center w-14 h-14 bg-white/10 rounded-2xl mb-3 backdrop-blur-md shadow-inner">
+                    <i class="fa-brands fa-whatsapp text-3xl text-emerald-300"></i>
+                </div>
+                <h2 class="text-2xl font-bold tracking-tight">OrderMate AI</h2>
+                <p class="text-xs text-emerald-100 mt-1 font-medium">Self-Service WhatsApp Ordering SaaS</p>
+            </div>
+
+            <!-- Tab Switcher -->
+            <div class="flex border-b border-slate-200 bg-slate-50 text-sm font-semibold">
+                <button @click="authMode = 'login'" :class="authMode === 'login' ? 'border-b-2 border-emerald-600 text-emerald-700 bg-white' : 'text-slate-500 hover:text-slate-700'" class="flex-1 py-3 transition">Sign In</button>
+                <button @click="authMode = 'register'" :class="authMode === 'register' ? 'border-b-2 border-emerald-600 text-emerald-700 bg-white' : 'text-slate-500 hover:text-slate-700'" class="flex-1 py-3 transition">Create Business Account</button>
+            </div>
+
+            <!-- Auth Form Content -->
+            <div class="p-6">
+                <div x-show="authError" class="mb-4 p-3 bg-red-50 border border-red-200 text-red-600 text-xs rounded-xl flex items-center gap-2">
+                    <i class="fa-solid fa-circle-exclamation"></i>
+                    <span x-text="authError"></span>
+                </div>
+
+                <!-- LOGIN -->
+                <form x-show="authMode === 'login'" @submit.prevent="handleLogin" class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">Owner Email</label>
+                        <input type="email" x-model="loginForm.email" required placeholder="owner@juiceisland.com" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">Password</label>
+                        <input type="password" x-model="loginForm.password" required placeholder="••••••••" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                    </div>
+                    <button type="submit" :disabled="authLoading" class="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-xl text-sm shadow-lg shadow-emerald-600/20 transition flex items-center justify-center gap-2">
+                        <span x-show="!authLoading">Log In to Dashboard</span>
+                        <span x-show="authLoading"><i class="fa-solid fa-circle-notch fa-spin"></i> Authenticating...</span>
+                    </button>
+                </form>
+
+                <!-- REGISTER -->
+                <form x-show="authMode === 'register'" @submit.prevent="handleRegister" class="space-y-3.5">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">Business / Store Name</label>
+                        <input type="text" x-model="registerForm.business_name" required placeholder="e.g. Juice Island" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">Owner Email</label>
+                        <input type="email" x-model="registerForm.owner_email" required placeholder="owner@juiceisland.com" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">Password</label>
+                        <input type="password" x-model="registerForm.password" required minlength="6" placeholder="At least 6 characters" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">Business Type</label>
+                            <input type="text" x-model="registerForm.business_category" placeholder="Juice Bar & Cafe" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">Currency</label>
+                            <select x-model="registerForm.currency" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                                <option value="USD">USD ($)</option>
+                                <option value="PKR">PKR (Rs)</option>
+                                <option value="AED">AED (د.إ)</option>
+                                <option value="GBP">GBP (£)</option>
+                                <option value="EUR">EUR (€)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <button type="submit" :disabled="authLoading" class="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-xl text-sm shadow-lg shadow-emerald-600/20 transition flex items-center justify-center gap-2">
+                        <span x-show="!authLoading">Create Store & Launch Bot</span>
+                        <span x-show="authLoading"><i class="fa-solid fa-circle-notch fa-spin"></i> Initializing...</span>
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── MAIN DASHBOARD APPLICATION ──────────────────────────────────── -->
+    <div x-show="isAuthenticated" class="min-h-screen flex flex-col">
+
+        <!-- Top Navigation Bar -->
+        <header class="bg-white border-b border-slate-200 sticky top-0 z-30">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex items-center justify-between h-16">
+                    <!-- Brand -->
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-500 flex items-center justify-center text-white shadow-md shadow-emerald-500/20">
+                            <i class="fa-brands fa-whatsapp text-xl"></i>
+                        </div>
+                        <div>
+                            <div class="flex items-center gap-2">
+                                <span class="font-bold text-lg text-slate-900 tracking-tight" x-text="tenant.business_name || 'OrderMate AI'"></span>
+                                <span class="px-2 py-0.5 rounded-full text-xs font-semibold" :class="tenant.is_live ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'" x-text="tenant.is_live ? 'LIVE' : 'OFFLINE'"></span>
+                            </div>
+                            <span class="text-xs text-slate-400">Slug: <code class="text-slate-600 font-mono" x-text="tenant.slug"></code></span>
+                        </div>
+                    </div>
+
+                    <!-- Right Controls -->
+                    <div class="flex items-center gap-3">
+                        <!-- Toggle Live Status -->
+                        <button @click="toggleLiveStatus" class="px-3 py-1.5 rounded-lg text-xs font-medium border transition flex items-center gap-1.5" :class="tenant.is_live ? 'border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100' : 'border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100'">
+                            <span class="w-2 h-2 rounded-full" :class="tenant.is_live ? 'bg-emerald-500' : 'bg-amber-500'"></span>
+                            <span x-text="tenant.is_live ? 'Store Live' : 'Go Live'"></span>
+                        </button>
+
+                        <!-- Open WhatsApp Simulator Button -->
+                        <button @click="showSimulator = true" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold shadow-md shadow-emerald-600/20 transition flex items-center gap-2">
+                            <i class="fa-brands fa-whatsapp text-sm"></i>
+                            <span>Test WhatsApp AI</span>
+                        </button>
+
+                        <!-- Logout -->
+                        <button @click="logout" title="Sign Out" class="p-2 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition">
+                            <i class="fa-solid fa-arrow-right-from-bracket"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Navigation Tabs -->
+                <div class="flex space-x-8 -mb-px text-sm font-medium overflow-x-auto">
+                    <button @click="currentTab = 'orders'" :class="currentTab === 'orders' ? 'border-emerald-500 text-emerald-600 border-b-2' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300 border-b-2'" class="py-3 px-1 transition flex items-center gap-2">
+                        <i class="fa-solid fa-bell-concierge"></i>
+                        <span>Live Orders</span>
+                        <span x-show="pendingOrdersCount > 0" class="px-1.5 py-0.5 rounded-full text-[10px] bg-emerald-500 text-white font-bold" x-text="pendingOrdersCount"></span>
+                    </button>
+                    <button @click="currentTab = 'menu'" :class="currentTab === 'menu' ? 'border-emerald-500 text-emerald-600 border-b-2' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300 border-b-2'" class="py-3 px-1 transition flex items-center gap-2">
+                        <i class="fa-solid fa-utensils"></i>
+                        <span>Menu & Products</span>
+                        <span class="px-1.5 py-0.5 rounded-full text-[10px] bg-slate-200 text-slate-600" x-text="totalProductsCount"></span>
+                    </button>
+                    <button @click="currentTab = 'whatsapp'" :class="currentTab === 'whatsapp' ? 'border-emerald-500 text-emerald-600 border-b-2' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300 border-b-2'" class="py-3 px-1 transition flex items-center gap-2">
+                        <i class="fa-brands fa-meta"></i>
+                        <span>Meta WhatsApp Setup</span>
+                    </button>
+                    <button @click="currentTab = 'settings'" :class="currentTab === 'settings' ? 'border-emerald-500 text-emerald-600 border-b-2' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300 border-b-2'" class="py-3 px-1 transition flex items-center gap-2">
+                        <i class="fa-solid fa-sliders"></i>
+                        <span>Hours & Delivery</span>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Body -->
+        <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+
+            <!-- Notification Toast -->
+            <div x-show="toast.show" x-transition.opacity class="fixed bottom-6 right-6 z-50 px-4 py-3 rounded-xl shadow-xl flex items-center gap-3 text-sm text-white" :class="toast.type === 'success' ? 'bg-emerald-600' : 'bg-red-600'">
+                <i :class="toast.type === 'success' ? 'fa-solid fa-circle-check' : 'fa-solid fa-circle-exclamation'"></i>
+                <span x-text="toast.message"></span>
+            </div>
+
+            <!-- ══════════════════════════════════════════════════════════════ -->
+            <!-- TAB 1: LIVE ORDERS KANBAN                                      -->
+            <!-- ══════════════════════════════════════════════════════════════ -->
+            <div x-show="currentTab === 'orders'" class="space-y-6">
+                <!-- Metrics Bar -->
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+                        <span class="text-xs font-semibold text-slate-400 uppercase">Pending</span>
+                        <div class="text-2xl font-bold text-amber-600 mt-1" x-text="ordersByStatus('pending').length"></div>
+                    </div>
+                    <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+                        <span class="text-xs font-semibold text-slate-400 uppercase">Preparing</span>
+                        <div class="text-2xl font-bold text-blue-600 mt-1" x-text="ordersByStatus('preparing').length"></div>
+                    </div>
+                    <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+                        <span class="text-xs font-semibold text-slate-400 uppercase">Ready / Out</span>
+                        <div class="text-2xl font-bold text-indigo-600 mt-1" x-text="ordersByStatus('ready').length"></div>
+                    </div>
+                    <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+                        <span class="text-xs font-semibold text-slate-400 uppercase">Completed</span>
+                        <div class="text-2xl font-bold text-emerald-600 mt-1" x-text="ordersByStatus('completed').length"></div>
+                    </div>
+                </div>
+
+                <!-- Kanban Pipeline -->
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-5">
+                    <!-- Column: Pending -->
+                    <div class="bg-slate-100/70 p-3.5 rounded-2xl border border-slate-200 flex flex-col min-h-[500px]">
+                        <div class="flex items-center justify-between pb-3 border-b border-slate-200/80 mb-3">
+                            <span class="font-semibold text-xs uppercase text-slate-700 tracking-wider">⏳ New / Pending</span>
+                            <span class="px-2 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-800" x-text="ordersByStatus('pending').length"></span>
+                        </div>
+                        <div class="space-y-3 flex-1 overflow-y-auto custom-scrollbar">
+                            <template x-for="ord in ordersByStatus('pending')" :key="ord.id">
+                                <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 space-y-2.5 hover:shadow-md transition">
+                                    <div class="flex items-center justify-between">
+                                        <span class="text-xs font-bold text-slate-800" x-text="'#' + ord.order_number"></span>
+                                        <span class="text-[11px] font-semibold px-2 py-0.5 rounded-md" :class="ord.order_type === 'delivery' ? 'bg-purple-100 text-purple-700' : 'bg-teal-100 text-teal-700'" x-text="ord.order_type.toUpperCase()"></span>
+                                    </div>
+                                    <div class="text-xs text-slate-600">
+                                        <div class="font-medium text-slate-800" x-text="ord.customer_name || 'WhatsApp Customer'"></div>
+                                        <div class="text-slate-400 text-[11px]" x-text="ord.customer_phone"></div>
+                                        <div x-show="ord.delivery_address" class="text-slate-500 mt-1 text-[11px] bg-slate-50 p-1.5 rounded border border-slate-100" x-text="'📍 ' + ord.delivery_address"></div>
+                                    </div>
+                                    <div class="border-t border-slate-100 pt-2 space-y-1">
+                                        <template x-for="item in ord.items" :key="item.id">
+                                            <div class="flex justify-between text-xs text-slate-700">
+                                                <span x-text="item.quantity + 'x ' + item.product_name"></span>
+                                                <span class="font-mono text-slate-500" x-text="tenant.currency + ' ' + item.subtotal.toFixed(2)"></span>
+                                            </div>
+                                        </template>
+                                    </div>
+                                    <div class="border-t border-slate-100 pt-2 flex items-center justify-between font-bold text-xs">
+                                        <span>Total:</span>
+                                        <span class="text-emerald-600 font-mono text-sm" x-text="tenant.currency + ' ' + ord.total.toFixed(2)"></span>
+                                    </div>
+                                    <button @click="updateOrderStatus(ord.id, 'preparing')" class="w-full mt-2 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-medium transition">
+                                        Accept & Prepare ➔
+                                    </button>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+
+                    <!-- Column: Preparing -->
+                    <div class="bg-slate-100/70 p-3.5 rounded-2xl border border-slate-200 flex flex-col min-h-[500px]">
+                        <div class="flex items-center justify-between pb-3 border-b border-slate-200/80 mb-3">
+                            <span class="font-semibold text-xs uppercase text-slate-700 tracking-wider">👨‍🍳 Preparing</span>
+                            <span class="px-2 py-0.5 rounded-full text-xs font-bold bg-blue-100 text-blue-800" x-text="ordersByStatus('preparing').length"></span>
+                        </div>
+                        <div class="space-y-3 flex-1 overflow-y-auto custom-scrollbar">
+                            <template x-for="ord in ordersByStatus('preparing')" :key="ord.id">
+                                <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 space-y-2.5">
+                                    <div class="flex items-center justify-between">
+                                        <span class="text-xs font-bold text-slate-800" x-text="'#' + ord.order_number"></span>
+                                        <span class="text-[11px] font-semibold px-2 py-0.5 rounded-md bg-blue-100 text-blue-700">IN KITCHEN</span>
+                                    </div>
+                                    <div class="text-xs">
+                                        <div class="font-medium text-slate-800" x-text="ord.customer_name"></div>
+                                        <div class="text-slate-400 text-[11px]" x-text="ord.customer_phone"></div>
+                                    </div>
+                                    <div class="border-t border-slate-100 pt-2 space-y-1">
+                                        <template x-for="item in ord.items" :key="item.id">
+                                            <div class="flex justify-between text-xs text-slate-700">
+                                                <span x-text="item.quantity + 'x ' + item.product_name"></span>
+                                            </div>
+                                        </template>
+                                    </div>
+                                    <button @click="updateOrderStatus(ord.id, 'ready')" class="w-full mt-2 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-medium transition">
+                                        Mark Ready / Out ➔
+                                    </button>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+
+                    <!-- Column: Ready / Out -->
+                    <div class="bg-slate-100/70 p-3.5 rounded-2xl border border-slate-200 flex flex-col min-h-[500px]">
+                        <div class="flex items-center justify-between pb-3 border-b border-slate-200/80 mb-3">
+                            <span class="font-semibold text-xs uppercase text-slate-700 tracking-wider">🛵 Ready / Dispatched</span>
+                            <span class="px-2 py-0.5 rounded-full text-xs font-bold bg-indigo-100 text-indigo-800" x-text="ordersByStatus('ready').length"></span>
+                        </div>
+                        <div class="space-y-3 flex-1 overflow-y-auto custom-scrollbar">
+                            <template x-for="ord in ordersByStatus('ready')" :key="ord.id">
+                                <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 space-y-2.5">
+                                    <div class="flex items-center justify-between">
+                                        <span class="text-xs font-bold text-slate-800" x-text="'#' + ord.order_number"></span>
+                                        <span class="text-[11px] font-semibold px-2 py-0.5 rounded-md bg-indigo-100 text-indigo-700" x-text="ord.order_type === 'delivery' ? 'OUT FOR DELIVERY' : 'READY AT COUNTER'"></span>
+                                    </div>
+                                    <div class="text-xs font-medium text-slate-800" x-text="ord.customer_name"></div>
+                                    <div class="text-xs font-bold text-emerald-600 font-mono" x-text="tenant.currency + ' ' + ord.total.toFixed(2)"></div>
+                                    <button @click="updateOrderStatus(ord.id, 'completed')" class="w-full mt-2 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-medium transition">
+                                        Complete Order ✓
+                                    </button>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+
+                    <!-- Column: Completed -->
+                    <div class="bg-slate-100/70 p-3.5 rounded-2xl border border-slate-200 flex flex-col min-h-[500px]">
+                        <div class="flex items-center justify-between pb-3 border-b border-slate-200/80 mb-3">
+                            <span class="font-semibold text-xs uppercase text-slate-700 tracking-wider">✅ Completed</span>
+                            <span class="px-2 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800" x-text="ordersByStatus('completed').length"></span>
+                        </div>
+                        <div class="space-y-3 flex-1 overflow-y-auto custom-scrollbar">
+                            <template x-for="ord in ordersByStatus('completed')" :key="ord.id">
+                                <div class="bg-white/80 p-3.5 rounded-xl border border-slate-200 text-xs space-y-1">
+                                    <div class="flex justify-between font-bold text-slate-700">
+                                        <span x-text="'#' + ord.order_number"></span>
+                                        <span class="text-emerald-600 font-mono" x-text="tenant.currency + ' ' + ord.total.toFixed(2)"></span>
+                                    </div>
+                                    <div class="text-slate-500" x-text="ord.customer_name + ' • ' + (new Date(ord.created_at)).toLocaleTimeString()"></div>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ══════════════════════════════════════════════════════════════ -->
+            <!-- TAB 2: MENU & PRODUCTS                                         -->
+            <!-- ══════════════════════════════════════════════════════════════ -->
+            <div x-show="currentTab === 'menu'" class="space-y-6">
+                <!-- Actions Bar -->
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+                    <div>
+                        <h3 class="font-bold text-slate-800">Menu Catalog</h3>
+                        <p class="text-xs text-slate-500">Products are queried by the WhatsApp AI ordering bot in real-time.</p>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <!-- Download Sample CSV -->
+                        <button @click="downloadSampleCsv" class="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-medium transition flex items-center gap-1.5">
+                            <i class="fa-solid fa-download"></i>
+                            <span>Sample CSV</span>
+                        </button>
+                        <!-- Bulk CSV Import -->
+                        <button @click="showCsvModal = true" class="px-3.5 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-xl text-xs font-semibold transition flex items-center gap-1.5">
+                            <i class="fa-solid fa-file-csv"></i>
+                            <span>Bulk Upload CSV</span>
+                        </button>
+                        <!-- Add Item Button -->
+                        <button @click="openNewItemModal" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold shadow-md shadow-emerald-600/20 transition flex items-center gap-1.5">
+                            <i class="fa-solid fa-plus"></i>
+                            <span>Add Product</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Menu Categories & Items List -->
+                <template x-for="cat in menuData.categories" :key="cat.id">
+                    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden mb-6">
+                        <div class="bg-slate-50 px-5 py-3 border-b border-slate-200 flex items-center justify-between">
+                            <div class="flex items-center gap-2">
+                                <span class="font-bold text-sm text-slate-800" x-text="cat.name"></span>
+                                <span class="text-xs text-slate-400" x-text="'(' + cat.products.length + ' items)'"></span>
+                            </div>
+                            <button @click="deleteCategory(cat.id)" class="text-xs text-red-500 hover:text-red-700"><i class="fa-solid fa-trash-can"></i></button>
+                        </div>
+                        <div class="divide-y divide-slate-100">
+                            <template x-for="prod in cat.products" :key="prod.id">
+                                <div class="p-4 flex items-center justify-between hover:bg-slate-50/50 transition">
+                                    <div class="flex items-center gap-3">
+                                        <div class="w-12 h-12 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-400 overflow-hidden">
+                                            <template x-if="prod.image_path">
+                                                <img :src="prod.image_path" class="w-full h-full object-cover">
+                                            </template>
+                                            <template x-if="!prod.image_path">
+                                                <i class="fa-solid fa-glass-water text-lg text-emerald-500"></i>
+                                            </template>
+                                        </div>
+                                        <div>
+                                            <div class="flex items-center gap-2">
+                                                <span class="font-semibold text-sm text-slate-900" x-text="prod.name"></span>
+                                                <span x-show="prod.is_best_seller" class="px-1.5 py-0.5 rounded text-[10px] bg-amber-100 text-amber-800 font-bold">⭐ Best Seller</span>
+                                            </div>
+                                            <p class="text-xs text-slate-500 line-clamp-1" x-text="prod.description || 'No description'"></p>
+                                        </div>
+                                    </div>
+                                    <div class="flex items-center gap-4">
+                                        <div class="font-mono font-bold text-sm text-slate-900" x-text="tenant.currency + ' ' + prod.price.toFixed(2)"></div>
+                                        <!-- Availability Toggle -->
+                                        <button @click="toggleAvailability(prod)" class="px-2.5 py-1 rounded-lg text-xs font-semibold border transition" :class="prod.is_available ? 'bg-emerald-50 border-emerald-300 text-emerald-700' : 'bg-slate-100 border-slate-300 text-slate-500'" x-text="prod.is_available ? 'In Stock' : 'Out of Stock'"></button>
+                                        <!-- Delete -->
+                                        <button @click="deleteProduct(prod.id)" class="text-slate-400 hover:text-red-600 text-xs p-1"><i class="fa-solid fa-trash"></i></button>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+                </template>
+            </div>
+
+            <!-- ══════════════════════════════════════════════════════════════ -->
+            <!-- TAB 3: META WHATSAPP SETUP                                     -->
+            <!-- ══════════════════════════════════════════════════════════════ -->
+            <div x-show="currentTab === 'whatsapp'" class="max-w-3xl space-y-6">
+                <!-- Self Service Instructions -->
+                <div class="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 p-5 rounded-2xl">
+                    <h3 class="font-bold text-emerald-900 flex items-center gap-2">
+                        <i class="fa-brands fa-whatsapp text-lg text-emerald-600"></i>
+                        <span>Connect Your Meta WhatsApp Cloud API (Self-Service)</span>
+                    </h3>
+                    <p class="text-xs text-emerald-800 mt-1 leading-relaxed">
+                        You do not need to share passwords! Follow these 3 easy steps in your <a href="https://developers.facebook.com/" target="_blank" class="underline font-bold">Meta Developer Portal</a> to connect your business WhatsApp number directly.
+                    </p>
+                </div>
+
+                <!-- Webhook Details (Copy & Paste to Meta) -->
+                <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+                    <h4 class="font-bold text-sm text-slate-900 uppercase tracking-wider">Step 1: Configure Webhook in Meta Portal</h4>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-500 uppercase mb-1">Callback URL (Webhook URL)</label>
+                        <div class="flex items-center gap-2">
+                            <input type="text" readonly :value="getAbsoluteWebhookUrl()" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono text-slate-700">
+                            <button @click="copyToClipboard(getAbsoluteWebhookUrl())" class="px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-medium transition flex items-center gap-1.5">
+                                <i class="fa-regular fa-copy"></i>
+                                <span>Copy</span>
+                            </button>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-500 uppercase mb-1">Verify Token</label>
+                        <div class="flex items-center gap-2">
+                            <input type="text" readonly :value="waConfig.verify_token" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono text-slate-700">
+                            <button @click="copyToClipboard(waConfig.verify_token)" class="px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-medium transition flex items-center gap-1.5">
+                                <i class="fa-regular fa-copy"></i>
+                                <span>Copy</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Meta Credentials Input -->
+                <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+                    <h4 class="font-bold text-sm text-slate-900 uppercase tracking-wider">Step 2: Enter Meta API Credentials</h4>
+                    <form @submit.prevent="saveWhatsAppConfig" class="space-y-4">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">Meta Phone Number ID</label>
+                            <input type="text" x-model="waForm.phone_number_id" required placeholder="e.g. 102938475610293" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-mono focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">WhatsApp Business Account ID (WABA ID)</label>
+                            <input type="text" x-model="waForm.waba_id" required placeholder="e.g. 987654321098765" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-mono focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">Permanent System User Access Token</label>
+                            <input type="password" x-model="waForm.access_token" required placeholder="EAAX..." class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-mono focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                            <p class="text-[11px] text-slate-400 mt-1">Generate a permanent token from Meta Business Settings > System Users > WhatsApp API permissions.</p>
+                        </div>
+                        <button type="submit" class="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold shadow-md shadow-emerald-600/20 transition">
+                            Save Meta WhatsApp Credentials
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- ══════════════════════════════════════════════════════════════ -->
+            <!-- TAB 4: STORE SETTINGS & OPERATING HOURS                       -->
+            <!-- ══════════════════════════════════════════════════════════════ -->
+            <div x-show="currentTab === 'settings'" class="max-w-3xl space-y-6">
+                <!-- Delivery & Pickup Settings -->
+                <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+                    <h4 class="font-bold text-sm text-slate-900 uppercase tracking-wider">Fulfillment & Delivery Settings</h4>
+                    <form @submit.prevent="saveStoreSettings" class="space-y-4">
+                        <div class="grid grid-cols-2 gap-4">
+                            <label class="flex items-center gap-3 p-3 bg-slate-50 rounded-xl border border-slate-200 cursor-pointer">
+                                <input type="checkbox" x-model="settingsForm.delivery_enabled" class="rounded text-emerald-600 focus:ring-emerald-500 w-4 h-4">
+                                <div>
+                                    <span class="text-xs font-semibold text-slate-800 block">Home Delivery</span>
+                                    <span class="text-[11px] text-slate-400">Offer doorstep delivery</span>
+                                </div>
+                            </label>
+                            <label class="flex items-center gap-3 p-3 bg-slate-50 rounded-xl border border-slate-200 cursor-pointer">
+                                <input type="checkbox" x-model="settingsForm.pickup_enabled" class="rounded text-emerald-600 focus:ring-emerald-500 w-4 h-4">
+                                <div>
+                                    <span class="text-xs font-semibold text-slate-800 block">Store Pickup</span>
+                                    <span class="text-[11px] text-slate-400">Customer collects at store</span>
+                                </div>
+                            </label>
+                        </div>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">Delivery Fee</label>
+                                <input type="number" step="0.5" x-model.number="settingsForm.delivery_fee" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">Minimum Order Value</label>
+                                <input type="number" step="1" x-model.number="settingsForm.min_order_value" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm">
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">Estimated Delivery Time (Mins)</label>
+                                <input type="number" x-model.number="settingsForm.delivery_eta_mins" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">Estimated Pickup Time (Mins)</label>
+                                <input type="number" x-model.number="settingsForm.pickup_eta_mins" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm">
+                            </div>
+                        </div>
+                        <button type="submit" class="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold shadow-md shadow-emerald-600/20 transition">
+                            Save Fulfillment Settings
+                        </button>
+                    </form>
+                </div>
+
+                <!-- Operating Hours -->
+                <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+                    <h4 class="font-bold text-sm text-slate-900 uppercase tracking-wider">Store Operating Hours</h4>
+                    <p class="text-xs text-slate-500">The AI bot automatically verifies these hours before letting customers place orders.</p>
+                    <div class="space-y-3">
+                        <template x-for="day in storeHours" :key="day.weekday">
+                            <div class="flex items-center justify-between p-3 rounded-xl border border-slate-100 bg-slate-50/50">
+                                <span class="font-semibold text-xs text-slate-800 w-28" x-text="getDayName(day.weekday)"></span>
+                                <div class="flex items-center gap-3">
+                                    <input type="time" x-model="day.open_time" :disabled="day.is_closed" class="px-2 py-1 bg-white border border-slate-200 rounded-lg text-xs">
+                                    <span class="text-xs text-slate-400">to</span>
+                                    <input type="time" x-model="day.close_time" :disabled="day.is_closed" class="px-2 py-1 bg-white border border-slate-200 rounded-lg text-xs">
+                                    <label class="flex items-center gap-1.5 text-xs text-slate-600 cursor-pointer ml-3">
+                                        <input type="checkbox" x-model="day.is_closed" class="rounded text-red-500">
+                                        <span>Closed</span>
+                                    </label>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                    <button @click="saveStoreHours" class="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold shadow-md shadow-emerald-600/20 transition">
+                        Update Weekly Store Hours
+                    </button>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════════════════ -->
+    <!-- CSV IMPORT MODAL                                                   -->
+    <!-- ══════════════════════════════════════════════════════════════════ -->
+    <div x-show="showCsvModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-6 border border-slate-200 space-y-4">
+            <div class="flex justify-between items-center">
+                <h3 class="font-bold text-slate-900 flex items-center gap-2">
+                    <i class="fa-solid fa-file-csv text-emerald-600"></i>
+                    <span>Bulk Upload Menu from CSV</span>
+                </h3>
+                <button @click="showCsvModal = false" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <p class="text-xs text-slate-500 leading-relaxed">
+                Upload a CSV file containing columns: <code class="text-emerald-700 font-mono bg-emerald-50 px-1 py-0.5 rounded">category,name,price,description,is_best_seller,image_url</code>.
+            </p>
+            <div class="border-2 border-dashed border-slate-200 rounded-2xl p-6 text-center hover:border-emerald-500 transition cursor-pointer" @click="$refs.csvInput.click()">
+                <i class="fa-solid fa-cloud-arrow-up text-3xl text-slate-400 mb-2"></i>
+                <p class="text-xs font-semibold text-slate-700">Click to choose CSV file or drag and drop</p>
+                <input type="file" x-ref="csvInput" @change="handleCsvFileSelect" accept=".csv" class="hidden">
+                <span x-show="selectedCsvFile" class="text-xs text-emerald-600 font-bold block mt-2" x-text="selectedCsvFile?.name"></span>
+            </div>
+            <div class="flex justify-end gap-2 pt-2">
+                <button @click="showCsvModal = false" class="px-4 py-2 bg-slate-100 text-slate-700 rounded-xl text-xs font-medium">Cancel</button>
+                <button @click="uploadCsvFile" :disabled="!selectedCsvFile || csvUploading" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-xl text-xs font-semibold transition">
+                    <span x-show="!csvUploading">Import Menu Now</span>
+                    <span x-show="csvUploading">Importing...</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════════════════ -->
+    <!-- ADD PRODUCT MODAL                                                  -->
+    <!-- ══════════════════════════════════════════════════════════════════ -->
+    <div x-show="showItemModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 border border-slate-200 space-y-4">
+            <div class="flex justify-between items-center">
+                <h3 class="font-bold text-slate-900">Add New Menu Product</h3>
+                <button @click="showItemModal = false" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <form @submit.prevent="saveNewProduct" class="space-y-3">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">Category</label>
+                    <input type="text" x-model="itemForm.category_name" required placeholder="e.g. Fresh Juices, Smoothies" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">Product Name</label>
+                    <input type="text" x-model="itemForm.name" required placeholder="e.g. Mango Madness" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">Price</label>
+                    <input type="number" step="0.01" x-model.number="itemForm.price" required placeholder="4.99" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">Description</label>
+                    <textarea x-model="itemForm.description" rows="2" placeholder="Freshly blended Pakistani mangoes..." class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm"></textarea>
+                </div>
+                <div class="flex items-center gap-2">
+                    <input type="checkbox" x-model="itemForm.is_best_seller" id="bs_check" class="rounded text-emerald-600">
+                    <label for="bs_check" class="text-xs font-semibold text-slate-700 cursor-pointer">Mark as Best Seller ⭐ (AI will recommend this)</label>
+                </div>
+                <div class="flex justify-end gap-2 pt-2">
+                    <button type="button" @click="showItemModal = false" class="px-4 py-2 bg-slate-100 text-slate-700 rounded-xl text-xs font-medium">Cancel</button>
+                    <button type="submit" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold transition">Save Product</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════════════════ -->
+    <!-- REALISTIC IN-BROWSER WHATSAPP PHONE SIMULATOR                      -->
+    <!-- ══════════════════════════════════════════════════════════════════ -->
+    <div x-show="showSimulator" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+        <!-- Phone Frame -->
+        <div class="relative w-full max-w-[380px] h-[700px] bg-black rounded-[48px] p-3 shadow-2xl border-4 border-slate-800 flex flex-col overflow-hidden">
+            
+            <!-- Dynamic Island / Speaker Notch -->
+            <div class="absolute top-4 left-1/2 -translate-x-1/2 w-28 h-4 bg-black rounded-full z-20"></div>
+
+            <!-- Phone Screen -->
+            <div class="flex-1 rounded-[38px] overflow-hidden flex flex-col bg-wa-bg relative">
+
+                <!-- WhatsApp Top Header -->
+                <div class="bg-wa-dark text-white px-4 pt-7 pb-3 flex items-center justify-between shadow z-10">
+                    <div class="flex items-center gap-2.5">
+                        <button @click="showSimulator = false" class="text-white hover:text-slate-200 text-sm mr-1">
+                            <i class="fa-solid fa-chevron-left"></i>
+                        </button>
+                        <div class="w-9 h-9 rounded-full bg-wa-teal flex items-center justify-center font-bold text-sm text-white shadow-inner">
+                            🍹
+                        </div>
+                        <div>
+                            <div class="font-bold text-sm leading-tight" x-text="tenant.business_name || 'Juice Island'"></div>
+                            <div class="text-[10px] text-emerald-200">OrderMate AI Bot • Online</div>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-3 text-sm text-emerald-100">
+                        <button @click="resetSimulator" title="Reset Chat" class="hover:text-white"><i class="fa-solid fa-rotate-right"></i></button>
+                        <button @click="showSimulator = false" title="Close" class="hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+                    </div>
+                </div>
+
+                <!-- Chat Messages Scroll Area -->
+                <div class="flex-1 p-3 overflow-y-auto space-y-3 wa-bg-pattern custom-scrollbar" x-ref="chatContainer">
+                    <template x-for="(msg, index) in simMessages" :key="index">
+                        <div :class="msg.sender === 'user' ? 'flex justify-end' : 'flex justify-start'">
+                            <div :class="msg.sender === 'user' ? 'bg-wa-light text-slate-900 rounded-2xl rounded-tr-none' : 'bg-white text-slate-900 rounded-2xl rounded-tl-none shadow-sm'" class="max-w-[85%] p-3 text-xs leading-relaxed space-y-2 border border-slate-200/50">
+                                <!-- Message Text -->
+                                <div class="whitespace-pre-wrap font-sans" x-html="renderFormattedMessage(msg.text)"></div>
+                                <!-- Interactive WhatsApp Buttons -->
+                                <template x-if="msg.buttons && msg.buttons.length">
+                                    <div class="border-t border-slate-200/60 pt-2 space-y-1.5">
+                                        <template x-for="btn in msg.buttons" :key="btn.id">
+                                            <button @click="sendSimulatorMessage(btn.title)" class="w-full py-1.5 px-3 bg-slate-50 hover:bg-emerald-50 text-emerald-700 font-semibold rounded-lg text-[11px] border border-slate-200 text-center transition">
+                                                <span x-text="btn.title"></span>
+                                            </button>
+                                        </template>
+                                    </div>
+                                </template>
+                                <!-- Timestamp & Double Checkmarks -->
+                                <div class="flex items-center justify-end gap-1 text-[9px] text-slate-400 mt-1">
+                                    <span x-text="msg.time"></span>
+                                    <template x-if="msg.sender === 'user'">
+                                        <i class="fa-solid fa-check-double text-blue-500"></i>
+                                    </template>
+                                </div>
+                            </div>
+                        </div>
+                    </template>
+                    <div x-show="simTyping" class="flex justify-start">
+                        <div class="bg-white rounded-2xl p-2.5 shadow-sm text-slate-400 text-xs flex items-center gap-1.5">
+                            <i class="fa-solid fa-ellipsis fa-bounce"></i>
+                            <span class="text-[10px]">AI is typing...</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Quick Prompt Chips -->
+                <div class="px-2 py-1.5 bg-slate-100 border-t border-slate-200 flex gap-1.5 overflow-x-auto text-[10px] whitespace-nowrap custom-scrollbar">
+                    <button @click="sendSimulatorMessage('Hi')" class="px-2 py-1 bg-white hover:bg-emerald-50 text-slate-700 rounded-full border border-slate-200">Hi</button>
+                    <button @click="sendSimulatorMessage('Show menu')" class="px-2 py-1 bg-white hover:bg-emerald-50 text-slate-700 rounded-full border border-slate-200">Show menu</button>
+                    <button @click="sendSimulatorMessage('What is your best juice?')" class="px-2 py-1 bg-white hover:bg-emerald-50 text-slate-700 rounded-full border border-slate-200">Best juice?</button>
+                    <button @click="sendSimulatorMessage('Checkout')" class="px-2 py-1 bg-white hover:bg-emerald-50 text-slate-700 rounded-full border border-slate-200">Checkout</button>
+                    <button @click="sendSimulatorMessage('Delivery')" class="px-2 py-1 bg-white hover:bg-emerald-50 text-slate-700 rounded-full border border-slate-200">Delivery</button>
+                    <button @click="sendSimulatorMessage('Street 10, House 42, Karachi')" class="px-2 py-1 bg-white hover:bg-emerald-50 text-slate-700 rounded-full border border-slate-200">Address</button>
+                    <button @click="sendSimulatorMessage('CONFIRM')" class="px-2 py-1 bg-emerald-600 text-white rounded-full font-bold">CONFIRM</button>
+                </div>
+
+                <!-- Chat Input Footer -->
+                <form @submit.prevent="sendSimulatorMessage(simInputText)" class="p-2 bg-slate-100 flex items-center gap-2 border-t border-slate-200">
+                    <input type="text" x-model="simInputText" placeholder="Type a message..." class="flex-1 py-2 px-3 bg-white rounded-full text-xs border border-slate-200 focus:outline-none focus:ring-1 focus:ring-wa-teal">
+                    <button type="submit" class="w-8 h-8 rounded-full bg-wa-teal hover:bg-wa-dark text-white flex items-center justify-center transition shadow-sm">
+                        <i class="fa-solid fa-paper-plane text-xs"></i>
+                    </button>
+                </form>
+
+            </div>
+        </div>
+    </div>
+
+    <!-- ── SCRIPT LOGIC (Alpine.js State) ──────────────────────────────── -->
+    <script>
+        function dashboardApp() {
+            return {
+                isAuthenticated: false,
+                authMode: 'login',
+                authLoading: false,
+                authError: '',
+                currentTab: 'orders',
+                tenant: {},
+                waConfig: {},
+                settingsForm: {
+                    delivery_enabled: true,
+                    pickup_enabled: true,
+                    delivery_fee: 2.0,
+                    min_order_value: 0.0,
+                    delivery_eta_mins: 30,
+                    pickup_eta_mins: 15,
+                },
+                storeHours: [],
+                waForm: {
+                    phone_number_id: '',
+                    waba_id: '',
+                    access_token: '',
+                },
+                menuData: { categories: [], uncategorized: [] },
+                orders: [],
+                loginForm: { email: '', password: '' },
+                registerForm: {
+                    business_name: '',
+                    owner_email: '',
+                    password: '',
+                    business_category: 'Fresh Juices & Smoothies',
+                    currency: 'USD',
+                },
+                toast: { show: false, message: '', type: 'success' },
+                showItemModal: false,
+                itemForm: { category_name: '', name: '', price: null, description: '', is_best_seller: false },
+                showCsvModal: false,
+                selectedCsvFile: null,
+                csvUploading: false,
+                showSimulator: false,
+                simMessages: [],
+                simInputText: '',
+                simTyping: false,
+
+                get totalProductsCount() {
+                    let total = this.menuData.uncategorized ? this.menuData.uncategorized.length : 0;
+                    if (this.menuData.categories) {
+                        for (let c of this.menuData.categories) {
+                            total += c.products ? c.products.length : 0;
+                        }
+                    }
+                    return total;
+                },
+
+                get pendingOrdersCount() {
+                    return this.orders.filter(o => o.status === 'pending').length;
+                },
+
+                async init() {
+                    const token = localStorage.getItem('ordermate_token');
+                    if (token) {
+                        this.isAuthenticated = true;
+                        await this.loadAllData();
+                        // Poll orders every 6 seconds
+                        setInterval(() => {
+                            if (this.isAuthenticated && this.currentTab === 'orders') {
+                                this.fetchOrders();
+                            }
+                        }, 6000);
+                    }
+                },
+
+                async apiCall(endpoint, method = 'GET', data = null) {
+                    const token = localStorage.getItem('ordermate_token');
+                    const headers = {};
+                    if (token) headers['Authorization'] = `Bearer ${token}`;
+
+                    const options = { method, headers };
+                    if (data && !(data instanceof FormData)) {
+                        headers['Content-Type'] = 'application/json';
+                        options.body = JSON.stringify(data);
+                    } else if (data instanceof FormData) {
+                        options.body = data;
+                    }
+
+                    const res = await fetch(endpoint, options);
+                    if (res.status === 401) {
+                        this.logout();
+                        throw new Error('Session expired. Please log in.');
+                    }
+                    if (!res.ok) {
+                        const err = await res.json().catch(() => ({ detail: 'Request failed' }));
+                        throw new Error(err.detail || 'An error occurred');
+                    }
+                    return res.json();
+                },
+
+                showToast(message, type = 'success') {
+                    this.toast = { show: true, message, type };
+                    setTimeout(() => { this.toast.show = false; }, 3500);
+                },
+
+                async handleLogin() {
+                    this.authLoading = true;
+                    this.authError = '';
+                    try {
+                        const res = await this.apiCall('/api/v1/auth/login', 'POST', this.loginForm);
+                        localStorage.setItem('ordermate_token', res.access_token);
+                        this.isAuthenticated = true;
+                        await this.loadAllData();
+                        this.showToast('Welcome back to OrderMate AI!');
+                    } catch (e) {
+                        this.authError = e.message;
+                    } finally {
+                        this.authLoading = false;
+                    }
+                },
+
+                async handleRegister() {
+                    this.authLoading = true;
+                    this.authError = '';
+                    try {
+                        const res = await this.apiCall('/api/v1/auth/register', 'POST', this.registerForm);
+                        localStorage.setItem('ordermate_token', res.access_token);
+                        this.isAuthenticated = true;
+                        await this.loadAllData();
+                        this.showToast('Store created successfully! Welcome to OrderMate AI.');
+                    } catch (e) {
+                        this.authError = e.message;
+                    } finally {
+                        this.authLoading = false;
+                    }
+                },
+
+                logout() {
+                    localStorage.removeItem('ordermate_token');
+                    this.isAuthenticated = false;
+                    this.tenant = {};
+                },
+
+                async loadAllData() {
+                    try {
+                        const [me, settings, hours, wa, menu, orders] = await Promise.all([
+                            this.apiCall('/api/v1/auth/me'),
+                            this.apiCall('/api/v1/tenants/settings'),
+                            this.apiCall('/api/v1/tenants/hours'),
+                            this.apiCall('/api/v1/tenants/whatsapp-config'),
+                            this.apiCall('/api/v1/menu'),
+                            this.apiCall('/api/v1/orders')
+                        ]);
+                        this.tenant = me;
+                        this.settingsForm = settings;
+                        this.storeHours = hours;
+                        this.waConfig = wa;
+                        this.waForm.phone_number_id = wa.phone_number_id || '';
+                        this.waForm.waba_id = wa.waba_id || '';
+                        this.menuData = menu;
+                        this.orders = orders;
+
+                        // Start simulator with initial bot greeting if empty
+                        if (this.simMessages.length === 0) {
+                            this.simMessages.push({
+                                sender: 'bot',
+                                text: `Hello! 👋 Welcome to *${this.tenant.business_name}* on WhatsApp.\n\nType *'menu'* to view items, or ask *'What is your best juice?'* to order!`,
+                                buttons: [
+                                    { id: 'menu', title: '📜 View Menu' },
+                                    { id: 'best', title: '⭐ Best Sellers' }
+                                ],
+                                time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                            });
+                        }
+                    } catch (e) {
+                        console.error('Error loading data:', e);
+                    }
+                },
+
+                async fetchOrders() {
+                    try {
+                        this.orders = await this.apiCall('/api/v1/orders');
+                    } catch (e) {
+                        console.error(e);
+                    }
+                },
+
+                ordersByStatus(status) {
+                    return this.orders.filter(o => o.status === status);
+                },
+
+                async updateOrderStatus(orderId, status) {
+                    try {
+                        await this.apiCall(`/api/v1/orders/${orderId}/status`, 'PATCH', { status });
+                        await this.fetchOrders();
+                        this.showToast(`Order status updated to ${status}`);
+                    } catch (e) {
+                        this.showToast(e.message, 'error');
+                    }
+                },
+
+                async toggleLiveStatus() {
+                    try {
+                        const res = await this.apiCall('/api/v1/tenants/toggle-live', 'POST');
+                        this.tenant.is_live = res.is_live;
+                        this.showToast(res.message);
+                    } catch (e) {
+                        this.showToast(e.message, 'error');
+                    }
+                },
+
+                async saveStoreSettings() {
+                    try {
+                        await this.apiCall('/api/v1/tenants/settings', 'PUT', this.settingsForm);
+                        this.showToast('Delivery & fulfillment settings saved!');
+                    } catch (e) {
+                        this.showToast(e.message, 'error');
+                    }
+                },
+
+                async saveStoreHours() {
+                    try {
+                        await this.apiCall('/api/v1/tenants/hours', 'PUT', { hours: this.storeHours });
+                        this.showToast('Operating hours updated successfully!');
+                    } catch (e) {
+                        this.showToast(e.message, 'error');
+                    }
+                },
+
+                async saveWhatsAppConfig() {
+                    try {
+                        const res = await this.apiCall('/api/v1/tenants/whatsapp-config', 'POST', this.waForm);
+                        this.waConfig = res;
+                        this.showToast('WhatsApp Cloud API configuration saved!');
+                    } catch (e) {
+                        this.showToast(e.message, 'error');
+                    }
+                },
+
+                openNewItemModal() {
+                    this.itemForm = { category_name: '', name: '', price: null, description: '', is_best_seller: false };
+                    this.showItemModal = true;
+                },
+
+                async saveNewProduct() {
+                    try {
+                        await this.apiCall('/api/v1/menu/items', 'POST', this.itemForm);
+                        this.showItemModal = false;
+                        this.menuData = await this.apiCall('/api/v1/menu');
+                        this.showToast('Product added to menu!');
+                    } catch (e) {
+                        this.showToast(e.message, 'error');
+                    }
+                },
+
+                async toggleAvailability(prod) {
+                    try {
+                        const updated = await this.apiCall(`/api/v1/menu/items/${prod.id}`, 'PUT', {
+                            is_available: !prod.is_available
+                        });
+                        prod.is_available = updated.is_available;
+                        this.showToast(`Updated: ${prod.name} is now ${prod.is_available ? 'In Stock' : 'Out of Stock'}`);
+                    } catch (e) {
+                        this.showToast(e.message, 'error');
+                    }
+                },
+
+                async deleteProduct(id) {
+                    if (!confirm('Are you sure you want to delete this product?')) return;
+                    try {
+                        await this.apiCall(`/api/v1/menu/items/${id}`, 'DELETE');
+                        this.menuData = await this.apiCall('/api/v1/menu');
+                        this.showToast('Product removed');
+                    } catch (e) {
+                        this.showToast(e.message, 'error');
+                    }
+                },
+
+                async deleteCategory(id) {
+                    if (!confirm('Delete this category? Products inside will become uncategorized.')) return;
+                    try {
+                        await this.apiCall(`/api/v1/menu/categories/${id}`, 'DELETE');
+                        this.menuData = await this.apiCall('/api/v1/menu');
+                        this.showToast('Category deleted');
+                    } catch (e) {
+                        this.showToast(e.message, 'error');
+                    }
+                },
+
+                handleCsvFileSelect(e) {
+                    this.selectedCsvFile = e.target.files[0];
+                },
+
+                async uploadCsvFile() {
+                    if (!this.selectedCsvFile) return;
+                    this.csvUploading = true;
+                    try {
+                        const formData = new FormData();
+                        formData.append('file', this.selectedCsvFile);
+                        const res = await this.apiCall('/api/v1/menu/upload-csv', 'POST', formData);
+                        this.showCsvModal = false;
+                        this.selectedCsvFile = null;
+                        this.menuData = await this.apiCall('/api/v1/menu');
+                        this.showToast(`Imported ${res.imported} menu items from CSV!`);
+                    } catch (e) {
+                        this.showToast(e.message, 'error');
+                    } finally {
+                        this.csvUploading = false;
+                    }
+                },
+
+                downloadSampleCsv() {
+                    const sample = `category,name,price,description,is_best_seller,image_url
+Fresh Juices,Mango Madness,4.99,Pure fresh blended ripe mangoes,true,
+Fresh Juices,Orange Sunshine,4.49,Cold pressed fresh navel oranges,false,
+Fresh Juices,Watermelon Splash,3.99,Refreshing crisp sweet watermelon juice,false,
+Smoothies & Shakes,Avocado Power Shake,5.99,Avocado honey almonds and fresh milk,true,
+Smoothies & Shakes,Berry Blast,5.49,Mixed strawberries and wild blueberries,false,
+Detox Specials,Green Detox,4.99,Spinach green apple cucumber and mint,false,`;
+                    const blob = new Blob([sample], { type: 'text/csv' });
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'ordermate_sample_menu.csv';
+                    a.click();
+                },
+
+                getAbsoluteWebhookUrl() {
+                    const origin = window.location.origin;
+                    return `${origin}/api/v1/webhook/${this.tenant.slug || 'your-slug'}`;
+                },
+
+                copyToClipboard(text) {
+                    navigator.clipboard.writeText(text);
+                    this.showToast('Copied to clipboard!');
+                },
+
+                getDayName(dayIndex) {
+                    return ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'][dayIndex];
+                },
+
+                renderFormattedMessage(text) {
+                    if (!text) return '';
+                    let escaped = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                    // Bold *text*
+                    escaped = escaped.replace(/\*(.*?)\*/g, '<strong>$1</strong>');
+                    // Italic _text_
+                    escaped = escaped.replace(/_(.*?)_/g, '<em>$1</em>');
+                    return escaped;
+                },
+
+                async sendSimulatorMessage(text) {
+                    if (!text || !text.trim()) return;
+                    const userMsg = text.trim();
+                    this.simInputText = '';
+
+                    const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                    this.simMessages.push({
+                        sender: 'user',
+                        text: userMsg,
+                        time: timeStr
+                    });
+
+                    this.scrollToBottom();
+                    this.simTyping = true;
+
+                    try {
+                        const res = await this.apiCall(`/api/v1/simulator/${this.tenant.slug}/chat`, 'POST', {
+                            customer_phone: '+923001234567',
+                            message: userMsg
+                        });
+
+                        this.simTyping = false;
+                        this.simMessages.push({
+                            sender: 'bot',
+                            text: res.reply_text,
+                            buttons: res.buttons,
+                            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                        });
+
+                        // If an order was just confirmed, refresh the orders Kanban immediately!
+                        if (res.order_id) {
+                            this.showToast(`🎉 New WhatsApp Order #${res.order_number} Received!`);
+                            await this.fetchOrders();
+                        }
+                    } catch (e) {
+                        this.simTyping = false;
+                        this.simMessages.push({
+                            sender: 'bot',
+                            text: '⚠️ Simulator error: ' + e.message,
+                            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                        });
+                    }
+
+                    this.scrollToBottom();
+                },
+
+                async resetSimulator() {
+                    try {
+                        await this.apiCall(`/api/v1/simulator/${this.tenant.slug}/reset`, 'POST', {
+                            customer_phone: '+923001234567'
+                        });
+                        this.simMessages = [{
+                            sender: 'bot',
+                            text: `Chat session reset. Welcome to *${this.tenant.business_name}*! Reply with *'menu'* to browse.`,
+                            buttons: [{ id: 'menu', title: '📜 View Menu' }],
+                            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                        }];
+                        this.showToast('Simulator conversation reset!');
+                    } catch (e) {
+                        this.showToast(e.message, 'error');
+                    }
+                },
+
+                scrollToBottom() {
+                    this.$nextTick(() => {
+                        const container = this.$refs.chatContainer;
+                        if (container) {
+                            container.scrollTop = container.scrollHeight;
+                        }
+                    });
+                }
+            }
+        }
+    </script>
+</body>
+</html>

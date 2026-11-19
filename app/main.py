@@ -10,6 +10,7 @@ from app.api.routes.menu import router as menu_router
 from app.api.routes.orders import router as orders_router
 from app.api.routes.webhook import router as webhook_router
 from app.api.routes.simulator import router as simulator_router
+from app.api.routes.web import router as web_router
 
 # ── Lifespan event handler ────────────────────────────────────────────────────
 @asynccontextmanager
@@ -34,6 +35,9 @@ UPLOADS_DIR = STATIC_DIR / "uploads"
 UPLOADS_DIR.mkdir(exist_ok=True)
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
+# ── Include Web UI Router ─────────────────────────────────────────────────────
+app.include_router(web_router)
+
 # ── Include API Routers ───────────────────────────────────────────────────────
 API_V1_PREFIX = "/api/v1"
 app.include_router(auth_router, prefix=API_V1_PREFIX)
@@ -50,6 +54,7 @@ def home():
         "message": "Welcome to OrderMate AI",
         "status": "running",
         "version": "0.1.0",
+        "dashboard_url": "/dashboard",
     }
 
 
